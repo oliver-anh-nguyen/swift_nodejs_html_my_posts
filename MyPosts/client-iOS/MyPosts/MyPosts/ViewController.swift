@@ -66,11 +66,32 @@ class Service: NSObject {
         }
         
     }
+    
+    func deletePost(id: Int, completion: @escaping (Error?) -> ()) {
+        guard let url = URL(string: "http://localhost:1337/post/\(id)") else {
+            return
+        }
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "DELETE"
+        URLSession.shared.dataTask(with: urlRequest) { (data, res, err) in
+            if err != nil {
+                print("error create post")
+                completion(err)
+            }
+            if let resp = res as? HTTPURLResponse, resp.statusCode != 200 {
+                let errorString = String(data: data ?? Data(), encoding: .utf8) ?? ""
+                completion(NSError(domain: "", code: resp.statusCode, userInfo: [NSLocalizedDescriptionKey: errorString]))
+                return
+            }
+            completion(nil)
+        }.resume()
+    }
 }
 
 
 
-class ViewController: UIViewController, UITableViewDataSource {
+class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     
     fileprivate func fetchPosts() {
         Service.shared.fetchPosts { (res) in
@@ -130,6 +151,24 @@ class ViewController: UIViewController, UITableViewDataSource {
         cell.textLabel?.text = posts[indexPath.row].title
         cell.detailTextLabel?.text = posts[indexPath.row].body
         return cell
+    }
+    
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+            print("delete post")
+            let post = self.posts[indexPath.row]
+            Service.shared.deletePost(id: post.id) { err in
+                if err != nil {
+                    print("Failed to create post", err)
+                    return
+                }
+                print("Finish create post")
+                self.posts.remove(at: indexPath.row)
+                DispatchQueue.main.async {
+                    self.myTableView.deleteRows(at:[indexPath], with:.automatic)
+                }
+            }
+        }
     }
 }
 
